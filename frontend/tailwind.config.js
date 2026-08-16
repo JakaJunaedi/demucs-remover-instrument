@@ -1,0 +1,28 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  darkMode: ["class"],
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        background: "var(--bg-primary)",
+        card: "var(--bg-card)",
+        hover: "var(--bg-hover)",
+        primary: "var(--accent-primary)",
+        secondary: "var(--accent-secondary)",
+        success: "var(--accent-success)",
+        warning: "var(--accent-warning)",
+        error: "var(--accent-error)",
+      },
+      borderRadius: {
+        lg: "12px",
+        md: "8px",
+        pill: "999px"
+      }
+    },
+  },
+  plugins: [],
+}
