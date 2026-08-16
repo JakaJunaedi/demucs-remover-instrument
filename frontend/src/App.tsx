@@ -132,11 +132,11 @@ function App() {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center p-6">
+      <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 w-full max-w-5xl mx-auto">
         {status === 'idle' && (
-          <div className="text-center mb-10 max-w-xl">
-            <h2 className="text-3xl font-bold mb-4">Pisahkan Vokal & Instrumen</h2>
-            <p className="text-text-secondary">
+          <div className="text-center mb-8 max-w-xl px-2">
+            <h2 className="text-2xl sm:text-3xl font-bold mb-4">Pisahkan Vokal & Instrumen</h2>
+            <p className="text-sm sm:text-base text-text-secondary">
               Unggah file audio Anda dan AI kami akan memisahkan vokal dan instrumen secara otomatis menggunakan model Demucs dengan kualitas tinggi.
             </p>
           </div>

@@ -2,12 +2,15 @@ import uuid
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from fastapi import APIRouter, UploadFile, File, BackgroundTasks, HTTPException
+from fastapi import APIRouter, UploadFile, File, BackgroundTasks, HTTPException, Request
 from core.config import UPLOADS_DIR, OUTPUTS_DIR
 from services.audio import validate_audio_file, get_audio_duration
 from services.demucs_worker import process_audio_task, update_metadata, get_metadata_path
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 import json
 
+limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(prefix="/api/v1")
 
 @router.get("/health")
@@ -21,7 +24,8 @@ def health_check():
     }
 
 @router.post("/upload")
-async def upload_audio(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+@limiter.limit("5/minute")
+async def upload_audio(request: Request, background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     # 1. Read file into memory for validation
     content = await file.read()
     

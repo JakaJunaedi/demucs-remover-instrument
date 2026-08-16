@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 
 # Install python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt && rm -rf /root/.cache/pip
 
 # Pre-download the Demucs model during build
 RUN python -c "import demucs.api; demucs.api.Separator(model='htdemucs_ft')"
