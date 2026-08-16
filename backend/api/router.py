@@ -80,3 +80,52 @@ def get_task_status(task_id: str):
         data["estimated_remaining_seconds"] = round(est_rem, 2)
         
     return data
+
+from fastapi.responses import FileResponse, StreamingResponse
+import io
+import zipfile
+
+@router.get("/download/{task_id}/{stem}")
+def download_stem(task_id: str, stem: str):
+    if stem not in ["vocals", "no_vocals"]:
+        raise HTTPException(status_code=400, detail="Stem tidak valid.")
+        
+    meta_path = get_metadata_path(task_id)
+    if not meta_path.exists():
+        raise HTTPException(status_code=404, detail="Task tidak ditemukan.")
+        
+    file_path = OUTPUTS_DIR / task_id / f"{stem}.wav"
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File belum siap atau sudah kadaluwarsa.")
+        
+    return FileResponse(
+        path=file_path,
+        media_type="audio/wav",
+        filename=f"{task_id}_{stem}.wav"
+    )
+
+@router.get("/download/{task_id}/zip")
+def download_zip(task_id: str):
+    meta_path = get_metadata_path(task_id)
+    if not meta_path.exists():
+        raise HTTPException(status_code=404, detail="Task tidak ditemukan.")
+        
+    dir_path = OUTPUTS_DIR / task_id
+    vocal_path = dir_path / "vocals.wav"
+    inst_path = dir_path / "no_vocals.wav"
+    
+    if not vocal_path.exists() or not inst_path.exists():
+        raise HTTPException(status_code=404, detail="File belum siap atau sudah kadaluwarsa.")
+        
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        zip_file.write(vocal_path, arcname=f"{task_id}_vocals.wav")
+        zip_file.write(inst_path, arcname=f"{task_id}_instrumental.wav")
+        
+    zip_buffer.seek(0)
+    
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename={task_id}_stems.zip"}
+    )

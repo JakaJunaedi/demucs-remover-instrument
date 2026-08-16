@@ -2,6 +2,7 @@ import subprocess
 import json
 import time
 import shutil
+import re
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from core.config import OUTPUTS_DIR, UPLOADS_DIR
@@ -27,6 +28,7 @@ def process_audio_task(task_id: str, filename: str, duration: float):
     """Background task to run Demucs and update metadata."""
     update_metadata(task_id, {
         "status": "processing",
+        "progress_percent": 0,
         "processing_start_time": datetime.now(timezone.utc).isoformat()
     })
     
@@ -36,9 +38,6 @@ def process_audio_task(task_id: str, filename: str, duration: float):
     try:
         start_time = time.time()
         
-        # Run Demucs
-        # Using htdemucs_ft, 2 stems (vocals, no_vocals)
-        # Using subprocess for isolation
         cmd = [
             "demucs",
             "--two-stems=vocals",
@@ -47,12 +46,49 @@ def process_audio_task(task_id: str, filename: str, duration: float):
             str(input_file)
         ]
         
-        subprocess.run(cmd, check=True, capture_output=True, text=True)
+        # Use Popen to read real-time output
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            universal_newlines=True
+        )
+        
+        last_percent = 0
+        current_pass = 1
+        total_passes = 2
+        
+        for line in process.stdout:
+            # Tampilkan langsung ke terminal backend agar pengguna bisa melihatnya
+            print(line, end="", flush=True)
+            
+            # tqdm progress usually looks like:  34%|███▍      |
+            match = re.search(r'(\d+)%', line)
+            if match:
+                percent = int(match.group(1))
+                
+                # Deteksi jika bar progress mereset kembali ke 0 (tanda masuk ke 'pass' selanjutnya)
+                if percent < last_percent and (last_percent - percent) > 50:
+                    current_pass += 1
+                    
+                last_percent = percent
+                
+                # Hitung persentase gabungan
+                pass_idx = min(current_pass - 1, total_passes - 1)
+                overall_percent = int((pass_idx * 50) + (percent / total_passes))
+                
+                update_metadata(task_id, {"progress_percent": overall_percent})
+                    
+        process.wait()
+        
+        if process.returncode != 0:
+            raise subprocess.CalledProcessError(process.returncode, cmd)
         
         processing_time = time.time() - start_time
         
-        # Demucs creates output at OUTPUTS_DIR / "htdemucs_ft" / filename_without_ext /
-        # We need to move it to OUTPUTS_DIR / task_id /
+        # Move output
         demucs_out_dir = OUTPUTS_DIR / "htdemucs_ft" / input_file.stem
         
         if demucs_out_dir.exists():
@@ -68,6 +104,7 @@ def process_audio_task(task_id: str, filename: str, duration: float):
         
         update_metadata(task_id, {
             "status": "completed",
+            "progress_percent": 100,
             "processing_time_seconds": round(processing_time, 2),
             "completed_at": completed_at.isoformat(),
             "expires_at": expires_at.isoformat(),
@@ -80,9 +117,9 @@ def process_audio_task(task_id: str, filename: str, duration: float):
     except subprocess.CalledProcessError as e:
         update_metadata(task_id, {
             "status": "failed",
-            "error": "Demucs processing failed."
+            "error": "Demucs processing failed. Check logs."
         })
-        print(f"Demucs error for {task_id}: {e.stderr}")
+        print(f"Demucs error for {task_id}: Exit code {e.returncode}")
     except Exception as e:
         update_metadata(task_id, {
             "status": "failed",
