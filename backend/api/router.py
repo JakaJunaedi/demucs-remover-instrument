@@ -154,3 +154,62 @@ def download_zip(task_id: str):
         media_type="application/zip",
         headers={"Content-Disposition": f"attachment; filename={task_id}_stems.zip"}
     )
+
+from pydantic import BaseModel
+
+class YoutubeDownloadRequest(BaseModel):
+    url: str
+    bitrate: str = "320"
+
+@router.post("/youtube/download")
+@limiter.limit("5/minute")
+async def youtube_download(request: Request, background_tasks: BackgroundTasks, payload: YoutubeDownloadRequest):
+    from services.youtube_worker import process_youtube_task, update_yt_metadata
+    
+    task_id = str(uuid.uuid4())
+    
+    meta = {
+        "task_id": task_id,
+        "status": "queued",
+        "url": payload.url,
+        "bitrate": payload.bitrate,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    update_yt_metadata(task_id, meta)
+    
+    background_tasks.add_task(process_youtube_task, task_id, payload.url, payload.bitrate)
+    
+    return {
+        "task_id": task_id,
+        "status": "queued",
+        "message": "Youtube download started."
+    }
+
+@router.get("/youtube/tasks/{task_id}")
+def get_yt_task_status(task_id: str):
+    from services.youtube_worker import get_yt_metadata_path
+    meta_path = get_yt_metadata_path(task_id)
+    if not meta_path.exists():
+        raise HTTPException(status_code=404, detail="Task tidak ditemukan.")
+        
+    with open(meta_path, "r") as f:
+        data = json.load(f)
+        
+    if data.get("status") == "processing" and "processing_start_time" in data:
+        start_time = datetime.fromisoformat(data["processing_start_time"])
+        elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
+        data["elapsed_seconds"] = round(elapsed, 2)
+        
+    return data
+
+@router.get("/youtube/download/{task_id}")
+def download_yt_file(task_id: str):
+    file_path = OUTPUTS_DIR / task_id / "audio.mp3"
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File belum siap atau sudah kadaluwarsa.")
+        
+    return FileResponse(
+        path=file_path,
+        media_type="audio/mpeg",
+        filename=f"youtube_{task_id}.mp3"
+    )

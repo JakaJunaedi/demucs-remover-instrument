@@ -1,18 +1,23 @@
+import { Routes, Route, Navigate } from 'react-router-dom'
+import { Toaster } from 'sonner'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
-import { Routes, Route } from 'react-router-dom'
 import { Home } from '@/pages/Home'
 import { Studio } from '@/pages/Studio'
-import { Toaster } from 'sonner'
+import { YoutubeConverter } from '@/pages/YoutubeConverter'
 
 function App() {
   return (
-    <DashboardLayout>
-      <Toaster theme="dark" position="top-center" />
+    <>
+      <Toaster position="top-center" theme="dark" />
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/studio" element={<Studio />} />
+        <Route path="/" element={<DashboardLayout />}>
+          <Route index element={<Home />} />
+          <Route path="studio" element={<Studio />} />
+          <Route path="youtube" element={<YoutubeConverter />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
       </Routes>
-    </DashboardLayout>
+    </>
   )
 }
 

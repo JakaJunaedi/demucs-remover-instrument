@@ -2,19 +2,16 @@ import React, { useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { BottomPlayer } from './BottomPlayer';
 import { Search, Bell, Menu } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Outlet } from 'react-router-dom';
 
-interface DashboardLayoutProps {
-  children: React.ReactNode;
-}
-
-export function DashboardLayout({ children }: DashboardLayoutProps) {
+export function DashboardLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const location = useLocation();
 
   // Helper to determine page title
   const getPageTitle = () => {
-    if (location.pathname === '/studio') return 'Studio';
+    if (location.pathname === '/studio') return 'Vocal Remover';
+    if (location.pathname === '/youtube') return 'YouTube to MP3';
     return 'Home';
   };
 
@@ -67,7 +64,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* Scrollable Content */}
           <main className="flex-1 overflow-y-auto overflow-x-hidden px-4 md:px-8 pb-8 scrollbar-hide">
             <div className="w-full mt-4 md:mt-6">
-              {children}
+              <Outlet />
             </div>
           </main>
           
