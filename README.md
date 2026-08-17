@@ -3,18 +3,19 @@
 A production-ready web application that uses **Demucs** (Meta's state-of-the-art AI model) to separate vocals and instrumental tracks from any audio file, alongside a fully integrated **YouTube to MP3** converter.
 
 ## Features ✨
-- **High-Quality Separation**: Powered by `htdemucs_ft` for studio-quality isolation.
+- **High-Quality Separation**: Powered by `htdemucs_ft` for studio-quality isolation (2-Stems & 4-Stems support).
+- **Vocal Cleanup (Artifact Remover)**: Powered by AI Spectral Noise Gating (`noisereduce`) to automatically clean robotic artifacts from extracted vocals.
 - **YouTube to MP3 Converter**: Direct downloads from YouTube with anti-bot bypass and quality selection (128-320kbps).
 - **Cloud-Native Storage**: Uses **MinIO** (S3-compatible) for highly scalable object storage and **PostgreSQL** for persistent task metadata.
 - **Real-time Progress UI**: See accurate percentage of AI processing with an animated audio equalizer and resilient polling.
-- **Interactive Stem Mixer**: Play both separated stems synchronously. Solo, mute, or adjust volume via a clean UI.
+- **Interactive Stem Mixer (Pro Mixer)**: DJ-style vertical faders for 4-stems and standard waveform mixer for 2-stems. Solo, mute, or adjust volume via a clean UI.
 - **Client-side Custom Mix Export**: Re-render the audio based on your mixer settings directly in the browser using the Web Audio API.
-- **One-Click Download**: Download Vocals, Instrumental, or a bundled ZIP. Uses S3 Presigned URLs for optimal server performance.
+- **Server-side ZIP Download**: Download Vocals, Instrumental, or a bundled ZIP. Uses S3 Presigned URLs for optimal server performance.
 - **Production DevOps**: Docker Compose orchestration for API, Database, and Object Storage.
 
 ## Architecture 🏗️
 - **Frontend**: React 19, Vite, TailwindCSS, Zustand (Persisted Polling State), Wavesurfer.js
-- **Backend**: FastAPI, SQLAlchemy, Boto3, `yt-dlp`, Python `subprocess` (to isolate CPU load).
+- **Backend**: FastAPI, SQLAlchemy, Boto3, `yt-dlp`, `scipy` & `noisereduce`, Python `subprocess` (to isolate CPU load).
 - **Infrastructure**: PostgreSQL 17 (Metadata), MinIO (Object Storage).
 
 ## Run Locally (Docker) 🐳

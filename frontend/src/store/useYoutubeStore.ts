@@ -16,7 +16,7 @@ interface YoutubeState {
   reset: () => void;
 }
 
-let pollingInterval: NodeJS.Timeout | null = null;
+let pollingInterval: ReturnType<typeof setInterval> | null = null;
 
 export const useYoutubeStore = create<YoutubeState>()(
   persist(

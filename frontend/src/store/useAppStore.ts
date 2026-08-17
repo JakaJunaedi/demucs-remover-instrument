@@ -19,7 +19,7 @@ interface AppState {
   reset: () => void;
 }
 
-let pollingInterval: NodeJS.Timeout | null = null;
+let pollingInterval: ReturnType<typeof setInterval> | null = null;
 
 export const useAppStore = create<AppState>()(
   persist(

@@ -46,6 +46,50 @@ export async function exportCustomMix(
   return audioBufferToWav(renderedBuffer);
 }
 
+export async function exportCustomMix4Stems(
+  urls: Record<string, string>,
+  volumes: Record<string, number>,
+  mutes: Record<string, boolean>
+): Promise<Blob> {
+  const stems = Object.keys(urls);
+  
+  // Fetch all audio files in parallel
+  const fetchPromises = stems.map(stem => fetch(urls[stem]).then(res => res.arrayBuffer()));
+  const arrayBuffers = await Promise.all(fetchPromises);
+  
+  const actx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  
+  // Decode all audio data
+  const decodePromises = arrayBuffers.map(buffer => actx.decodeAudioData(buffer));
+  const audioBuffers = await Promise.all(decodePromises);
+  
+  // Use OfflineAudioContext for rendering
+  const maxLength = Math.max(...audioBuffers.map(b => b.length));
+  // Use max sample rate from buffers, default to 44100
+  const sampleRate = audioBuffers[0]?.sampleRate || 44100;
+  
+  const offlineCtx = new OfflineAudioContext(2, maxLength, sampleRate);
+  
+  // Create and connect sources and gains
+  stems.forEach((stem, index) => {
+    const buffer = audioBuffers[index];
+    const source = offlineCtx.createBufferSource();
+    source.buffer = buffer;
+    
+    const gain = offlineCtx.createGain();
+    gain.gain.value = mutes[stem] ? 0 : volumes[stem];
+    
+    source.connect(gain);
+    gain.connect(offlineCtx.destination);
+    
+    source.start();
+  });
+  
+  const renderedBuffer = await offlineCtx.startRendering();
+  
+  return audioBufferToWav(renderedBuffer);
+}
+
 // Minimal AudioBuffer to WAV converter
 function audioBufferToWav(buffer: AudioBuffer): Blob {
   const numOfChan = buffer.numberOfChannels;

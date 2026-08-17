@@ -3,6 +3,7 @@ import { Toaster } from 'sonner'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Home } from '@/pages/Home'
 import { Studio } from '@/pages/Studio'
+import { VocalCleanup } from '@/pages/VocalCleanup'
 import { YoutubeConverter } from '@/pages/YoutubeConverter'
 
 function App() {
@@ -13,6 +14,7 @@ function App() {
         <Route path="/" element={<DashboardLayout />}>
           <Route index element={<Home />} />
           <Route path="studio" element={<Studio />} />
+          <Route path="cleanup" element={<VocalCleanup />} />
           <Route path="youtube" element={<YoutubeConverter />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

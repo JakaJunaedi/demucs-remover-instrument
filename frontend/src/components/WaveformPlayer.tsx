@@ -64,7 +64,8 @@ export const WaveformPlayer = forwardRef<WaveformPlayerRef, WaveformPlayerProps>
       
       wsInst.current.on('play', () => wsVocals.current?.play());
       wsInst.current.on('pause', () => wsVocals.current?.pause());
-      wsInst.current.on('seek', (progress) => wsVocals.current?.seekTo(progress));
+      // @ts-ignore
+      wsInst.current.on('seeking', (progress) => wsVocals.current?.seekTo(progress as number));
       
       wsInst.current.on('finish', () => setIsPlaying(false));
 

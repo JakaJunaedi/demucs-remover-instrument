@@ -60,7 +60,7 @@ def cancel_task(task_id: str) -> bool:
             return False
     return False
 
-def process_audio_task(task_id: str, filename: str, duration: float):
+def process_audio_task(task_id: str, filename: str, duration: float, stem_mode: str = "2"):
     """Background task to run Demucs and update metadata."""
     update_metadata(task_id, {
         "status": "processing",
@@ -76,12 +76,14 @@ def process_audio_task(task_id: str, filename: str, duration: float):
         
         cmd = [
             "demucs",
-            "--two-stems=vocals",
             "-n", "htdemucs_ft",
             "--out", str(OUTPUTS_DIR),
             str(input_file)
         ]
         
+        if stem_mode == "2":
+            cmd.insert(1, "--two-stems=vocals")
+            
         # Use Popen to read real-time output
         process = subprocess.Popen(
             cmd,
@@ -96,7 +98,7 @@ def process_audio_task(task_id: str, filename: str, duration: float):
         
         last_percent = 0
         current_pass = 1
-        total_passes = 4
+        total_passes = 4 if stem_mode == "2" else 8 # 4 stems has more passes
         
         for line in process.stdout:
             # Tampilkan langsung ke terminal backend agar pengguna bisa melihatnya
@@ -133,22 +135,30 @@ def process_audio_task(task_id: str, filename: str, duration: float):
         # Move output
         demucs_out_dir = OUTPUTS_DIR / "htdemucs_ft" / input_file.stem
         
+        stems_meta = {}
+        
         if demucs_out_dir.exists():
             output_dir.mkdir(parents=True, exist_ok=True)
-            shutil.copy(demucs_out_dir / "vocals.wav", output_dir / "vocals.wav")
-            shutil.copy(demucs_out_dir / "no_vocals.wav", output_dir / "no_vocals.wav")
             
-            # Upload to MinIO
-            vocal_key = f"{task_id}/vocals.wav"
-            inst_key = f"{task_id}/no_vocals.wav"
-            upload_file_to_minio(str(output_dir / "vocals.wav"), vocal_key)
-            upload_file_to_minio(str(output_dir / "no_vocals.wav"), inst_key)
+            if stem_mode == "2":
+                expected_files = ["vocals.wav", "no_vocals.wav"]
+            else:
+                expected_files = ["vocals.wav", "drums.wav", "bass.wav", "other.wav"]
+                
+            for fname in expected_files:
+                if (demucs_out_dir / fname).exists():
+                    shutil.copy(demucs_out_dir / fname, output_dir / fname)
+                    
+                    # Upload to MinIO
+                    key = f"{task_id}/{fname}"
+                    upload_file_to_minio(str(output_dir / fname), key)
+                    
+                    fsize = (output_dir / fname).stat().st_size
+                    stem_name = fname.replace(".wav", "")
+                    stems_meta[stem_name] = {"file": fname, "size_bytes": fsize, "minio_key": key}
             
             shutil.rmtree(demucs_out_dir)
             
-        vocals_size = (output_dir / "vocals.wav").stat().st_size if (output_dir / "vocals.wav").exists() else 0
-        no_vocals_size = (output_dir / "no_vocals.wav").stat().st_size if (output_dir / "no_vocals.wav").exists() else 0
-        
         completed_at = datetime.now(timezone.utc)
         expires_at = completed_at + timedelta(days=1)
         
@@ -158,10 +168,8 @@ def process_audio_task(task_id: str, filename: str, duration: float):
             "processing_time_seconds": round(processing_time, 2),
             "completed_at": completed_at.isoformat(),
             "expires_at": expires_at.isoformat(),
-            "stems": {
-                "vocals": {"file": "vocals.wav", "size_bytes": vocals_size, "minio_key": vocal_key},
-                "no_vocals": {"file": "no_vocals.wav", "size_bytes": no_vocals_size, "minio_key": inst_key}
-            }
+            "stems": stems_meta,
+            "stem_mode": stem_mode
         })
         
         # Cleanup

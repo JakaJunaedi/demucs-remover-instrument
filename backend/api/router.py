@@ -8,7 +8,7 @@ import shutil
 import io
 import zipfile
 
-from fastapi import APIRouter, UploadFile, File, BackgroundTasks, HTTPException, Request
+from fastapi import APIRouter, UploadFile, File, BackgroundTasks, HTTPException, Request, Form
 from fastapi.responses import FileResponse, StreamingResponse, RedirectResponse
 from core.config import UPLOADS_DIR, OUTPUTS_DIR
 from core.db import SessionLocal
@@ -46,9 +46,17 @@ def health_check():
 
 @router.post("/upload")
 @limiter.limit("5/minute")
-async def upload_audio(request: Request, background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+async def upload_audio(
+    request: Request, 
+    background_tasks: BackgroundTasks, 
+    file: UploadFile = File(...),
+    stem_mode: str = Form("2")
+):
     if not file.content_type.startswith("audio/") and not file.content_type.startswith("video/"):
         raise HTTPException(status_code=400, detail="File must be an audio or video file")
+        
+    if stem_mode not in ["2", "4"]:
+        raise HTTPException(status_code=400, detail="Invalid stem_mode. Must be '2' or '4'")
         
     task_id = str(uuid.uuid4())
     
@@ -63,7 +71,7 @@ async def upload_audio(request: Request, background_tasks: BackgroundTasks, file
     # Validate
     validate_audio_file(content, file.filename)
     duration = get_audio_duration(file_path)
-    estimated_time = duration * 3
+    estimated_time = duration * 3 if stem_mode == "2" else duration * 5
     
     # Save to DB
     db = SessionLocal()
@@ -76,7 +84,8 @@ async def upload_audio(request: Request, background_tasks: BackgroundTasks, file
                 "original_filename": file.filename,
                 "duration_seconds": duration,
                 "estimated_processing_seconds": estimated_time,
-                "progress_percent": 0
+                "progress_percent": 0,
+                "stem_mode": stem_mode
             }
         )
         db.add(new_task)
@@ -88,7 +97,8 @@ async def upload_audio(request: Request, background_tasks: BackgroundTasks, file
         process_audio_task, 
         task_id=task_id, 
         filename=file.filename,
-        duration=duration
+        duration=duration,
+        stem_mode=stem_mode
     )
     
     return {
@@ -96,7 +106,8 @@ async def upload_audio(request: Request, background_tasks: BackgroundTasks, file
         "status": "queued",
         "filename": file.filename,
         "duration_seconds": duration,
-        "estimated_processing_seconds": estimated_time
+        "estimated_processing_seconds": estimated_time,
+        "stem_mode": stem_mode
     }
 
 @router.get("/tasks/{task_id}")
@@ -132,9 +143,71 @@ def cancel_task_endpoint(task_id: str):
         return {"message": "Tugas dibatalkan."}
     raise HTTPException(status_code=400, detail="Tidak dapat membatalkan tugas ini.")
 
+@router.get("/download/{task_id}/zip")
+def download_zip(task_id: str, background_tasks: BackgroundTasks):
+    task = get_task_from_db(task_id)
+    if task.status != "completed":
+        raise HTTPException(status_code=400, detail="File belum siap.")
+        
+    stems = task.meta_data.get("stems", {})
+    if not stems:
+        raise HTTPException(status_code=404, detail="Data stems tidak ditemukan.")
+        
+    zip_path = OUTPUTS_DIR / f"{task_id}_all.zip"
+    
+    # If the zip doesn't exist yet, create it by streaming from MinIO
+    if not zip_path.exists():
+        from core.storage import s3_client, MINIO_BUCKET
+        
+        try:
+            zip_path.parent.mkdir(parents=True, exist_ok=True)
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_STORED) as zipf:
+                for stem_info in stems.values():
+                    if "minio_key" in stem_info and "file" in stem_info:
+                        response = s3_client.get_object(Bucket=MINIO_BUCKET, Key=stem_info["minio_key"])
+                        with zipf.open(stem_info["file"], 'w') as zfile:
+                            shutil.copyfileobj(response['Body'], zfile)
+        except Exception as e:
+            if zip_path.exists():
+                zip_path.unlink()
+            print(f"Error creating ZIP: {e}")
+            raise HTTPException(status_code=500, detail="Gagal membuat file ZIP.")
+            
+    # Optionally delete the zip after sending to save disk space
+    def cleanup_zip():
+        if zip_path.exists():
+            try:
+                zip_path.unlink()
+            except:
+                pass
+                
+    background_tasks.add_task(cleanup_zip)
+    
+    return FileResponse(
+        path=zip_path,
+        media_type="application/zip",
+        filename=f"{task.meta_data.get('original_filename', 'audio')}_stems.zip"
+    )
+
+@router.get("/download/{task_id}/cleaned")
+def download_cleaned(task_id: str):
+    task = get_task_from_db(task_id)
+    if task.status != "completed":
+        raise HTTPException(status_code=400, detail="File belum siap.")
+        
+    minio_key = task.meta_data.get("cleaned_minio_key")
+    if not minio_key:
+        raise HTTPException(status_code=404, detail="File bersih tidak ditemukan.")
+        
+    url = generate_presigned_url(minio_key)
+    if not url:
+        raise HTTPException(status_code=500, detail="Gagal membuat URL download.")
+        
+    return RedirectResponse(url=url)
+
 @router.get("/download/{task_id}/{stem}")
 def download_stem(task_id: str, stem: str):
-    if stem not in ["vocals", "no_vocals"]:
+    if stem not in ["vocals", "no_vocals", "drums", "bass", "other"]:
         raise HTTPException(status_code=400, detail="Stem tidak valid.")
         
     task = get_task_from_db(task_id)
@@ -152,6 +225,41 @@ def download_stem(task_id: str, stem: str):
         raise HTTPException(status_code=500, detail="Gagal membuat URL download.")
         
     return RedirectResponse(url=url)
+
+@router.post("/cleanup")
+@limiter.limit("5/minute")
+async def upload_cleanup(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...)
+):
+    if not file.content_type.startswith("audio/"):
+        raise HTTPException(status_code=400, detail="Must be an audio file")
+        
+    task_id = str(uuid.uuid4())
+    ext = file.filename.split(".")[-1] if "." in file.filename else "wav"
+    temp_path = UPLOADS_DIR / f"{task_id}.{ext}"
+    
+    with open(temp_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    db = SessionLocal()
+    try:
+        new_task = Task(
+            id=task_id,
+            status="pending",
+            task_type="cleanup",
+            meta_data={"original_filename": file.filename}
+        )
+        db.add(new_task)
+        db.commit()
+    finally:
+        db.close()
+        
+    from services.cleanup_worker import process_cleanup_task
+    background_tasks.add_task(process_cleanup_task, task_id, str(temp_path))
+    
+    return {"task_id": task_id, "status": "pending"}
 
 class YoutubeDownloadRequest(BaseModel):
     url: str

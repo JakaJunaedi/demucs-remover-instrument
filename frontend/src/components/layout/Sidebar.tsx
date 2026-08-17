@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Compass, Heart, Mic2, Music, FolderOpen, PlayCircle, Settings, X, MonitorPlay } from 'lucide-react';
+import { Home, Compass, Heart, Mic2, Music, FolderOpen, PlayCircle, Settings, X, MonitorPlay, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SidebarProps {
@@ -94,6 +94,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 <Link to="/studio" onClick={onClose} className={getLinkClass('/studio')}>
                   <Mic2 className={cn("w-5 h-5", currentPath === '/studio' ? "text-accent-primary" : "")} />
                   <span>Vocal Remover</span>
+                </Link>
+              </li>
+              <li>
+                <Link to="/cleanup" onClick={onClose} className={getLinkClass('/cleanup')}>
+                  <Sparkles className={cn("w-5 h-5", currentPath === '/cleanup' ? "text-pink-400" : "")} />
+                  <span>Vocal Cleanup</span>
                 </Link>
               </li>
               <li>

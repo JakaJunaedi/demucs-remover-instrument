@@ -14,6 +14,7 @@ export function AudioUploader({ onTaskQueued }: AudioUploaderProps) {
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stemMode, setStemMode] = useState<"2" | "4">("2");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -70,6 +71,7 @@ export function AudioUploader({ onTaskQueued }: AudioUploaderProps) {
     
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('stem_mode', stemMode);
 
     try {
       const response = await axios.post('http://localhost:8000/api/v1/upload', formData, {
@@ -93,6 +95,34 @@ export function AudioUploader({ onTaskQueued }: AudioUploaderProps) {
         <CardDescription>Pisahkan Vokal dan Instrumen menggunakan AI Demucs</CardDescription>
       </CardHeader>
       <CardContent>
+        
+        <div className="flex justify-center mb-6 mt-2">
+          <div className="bg-black/30 p-1 rounded-full flex border border-white/5">
+            <button
+              onClick={() => setStemMode("2")}
+              className={cn(
+                "px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 active:scale-95",
+                stemMode === "2" 
+                  ? "bg-gradient-to-br from-[#FFB775] to-[#E05297] text-white shadow-lg" 
+                  : "text-text-secondary hover:text-white hover:bg-white/5"
+              )}
+            >
+              2 Stems (Standard)
+            </button>
+            <button
+              onClick={() => setStemMode("4")}
+              className={cn(
+                "px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 active:scale-95",
+                stemMode === "4" 
+                  ? "bg-gradient-to-br from-[#FFB775] to-[#E05297] text-white shadow-lg" 
+                  : "text-text-secondary hover:text-white hover:bg-white/5"
+              )}
+            >
+              4 Stems (Pro)
+            </button>
+          </div>
+        </div>
+
         <div 
           className={cn(
             "border-2 border-dashed rounded-xl p-10 flex flex-col items-center justify-center transition-all text-center cursor-pointer mt-4",

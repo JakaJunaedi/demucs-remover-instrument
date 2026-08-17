@@ -1,4 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { ProMixerConsole } from '@/components/studio/ProMixerConsole';
+import type { ProMixState } from '@/components/studio/ProMixerConsole';
 import { useAppStore } from '@/store/useAppStore';
 import { AudioUploader } from '@/components/AudioUploader';
 import { DownloadManager } from '@/components/DownloadManager';
@@ -18,6 +20,19 @@ export function Studio() {
     vocals: { volume: 1, muted: false },
     instrumental: { volume: 1, muted: false }
   });
+
+  const [proMixState, setProMixState] = useState<ProMixState>({
+    volumes: { 'Vocals': 1, 'Drums': 1, 'Bass': 1, 'Melody': 1 },
+    mutes: { 'Vocals': false, 'Drums': false, 'Bass': false, 'Melody': false }
+  });
+
+  const handleProVolumeChange = (name: string, val: number) => {
+    setProMixState(prev => ({ ...prev, volumes: { ...prev.volumes, [name]: val } }));
+  };
+
+  const handleProMuteToggle = (name: string) => {
+    setProMixState(prev => ({ ...prev, mutes: { ...prev.mutes, [name]: !prev.mutes[name] } }));
+  };
   
   useEffect(() => {
     if (playerRef.current) {
@@ -134,27 +149,53 @@ export function Studio() {
           </div>
         )}
 
-        {status === 'completed' && (
+        {status === 'completed' && progressData && (
           <div className="w-full max-w-4xl flex flex-col items-center animate-in fade-in zoom-in duration-500">
             <div className="w-full flex justify-between items-end mb-4 px-2">
               <div>
                 <h2 className="text-2xl font-bold text-text-primary">Hasil Pemisahan</h2>
                 <p className="text-text-secondary text-sm">Task ID: {taskId}</p>
+                {progressData.stem_mode === "4" && (
+                  <span className="inline-block mt-1 bg-accent-secondary/20 text-accent-secondary text-xs px-2 py-0.5 rounded-full border border-accent-secondary/30">
+                    Pro Mode (4 Stems)
+                  </span>
+                )}
               </div>
               <Button onClick={reset} variant="link" className="text-accent-primary hover:text-white px-0">
                 + Upload Baru
               </Button>
             </div>
             
-            <WaveformPlayer 
-              ref={playerRef}
-              vocalsUrl={`http://localhost:8000/api/v1/download/${taskId}/vocals`}
-              instrumentalUrl={`http://localhost:8000/api/v1/download/${taskId}/no_vocals`}
+            {progressData.stem_mode === "4" ? (
+              <ProMixerConsole 
+                taskId={taskId!} 
+                stems={[
+                  { name: 'Vocals', url: `http://localhost:8000/api/v1/download/${taskId}/vocals`, color: '#ec4899' },
+                  { name: 'Drums', url: `http://localhost:8000/api/v1/download/${taskId}/drums`, color: '#3b82f6' },
+                  { name: 'Bass', url: `http://localhost:8000/api/v1/download/${taskId}/bass`, color: '#eab308' },
+                  { name: 'Melody', url: `http://localhost:8000/api/v1/download/${taskId}/other`, color: '#10b981' }
+                ]}
+                mixState={proMixState}
+                onVolumeChange={handleProVolumeChange}
+                onMuteToggle={handleProMuteToggle}
+              />
+            ) : (
+              <>
+                <WaveformPlayer 
+                  ref={playerRef}
+                  vocalsUrl={`http://localhost:8000/api/v1/download/${taskId}/vocals`}
+                  instrumentalUrl={`http://localhost:8000/api/v1/download/${taskId}/no_vocals`}
+                />
+                <StemMixer mix={mixState} onChange={setMixState} />
+              </>
+            )}
+            
+            <DownloadManager 
+              taskId={taskId!} 
+              mixState={mixState} 
+              stemMode={progressData.stem_mode} 
+              proMixState={proMixState}
             />
-            
-            <StemMixer mix={mixState} onChange={setMixState} />
-            
-            <DownloadManager taskId={taskId!} mixState={mixState} />
           </div>
         )}
       </div>

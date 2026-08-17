@@ -2,9 +2,9 @@
 
 ## Vocal Remover Web App
 
-**Versi:** 1.1  
+**Versi:** 1.3  
 **Tanggal:** 17 Agustus 2026  
-**Status:** Draft (Revised)  
+**Status:** Updated (Phase 11 & Phase 12 Complete)  
 **Author:** Product Team
 
 ---
@@ -40,17 +40,17 @@ Vocal Remover Web App adalah aplikasi berbasis web yang memungkinkan pengguna un
 
 ## 2. Scope & Constraints
 
-### 2.1 In-Scope (MVP)
+### 2.1 In-Scope (MVP & v1.3 Updates)
 - Upload file audio (MP3, WAV, FLAC, M4A)
-- Separasi 2-stem: Vocals + Instrumental
+- Separasi 2-stem (Vocals + Instrumental) & 4-stem (Vocals, Drums, Bass, Other)
+- Vocal Cleanup (Artifact Remover) dengan AI Spectral Noise Gating
 - Visualisasi waveform untuk audio asli dan hasil
-- Playback kontrol (play/pause, volume) untuk masing-masing stem
-- Download hasil separasi (individu atau mix)
+- Playback kontrol (play/pause, volume, mute) untuk masing-masing stem via Pro Mixer
+- Server-side ZIP Download dan Client-side Custom Mix Export (WAV)
 - Progress indicator saat processing
 - Docker Compose untuk local deployment
 
 ### 2.2 Out-of-Scope (Future Release)
-- Separasi 4-stem (drums, bass, vocals, other)
 - Real-time processing / live audio input
 - Batch processing multiple files
 - Cloud GPU deployment
