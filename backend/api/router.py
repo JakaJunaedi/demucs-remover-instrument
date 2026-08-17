@@ -85,6 +85,27 @@ def get_task_status(task_id: str):
         
     return data
 
+@router.post("/tasks/{task_id}/pause")
+def pause_task_endpoint(task_id: str):
+    from services.demucs_worker import pause_task
+    if pause_task(task_id):
+        return {"message": "Tugas di-pause."}
+    raise HTTPException(status_code=400, detail="Tidak dapat mem-pause tugas ini. Mungkin sudah selesai atau error.")
+
+@router.post("/tasks/{task_id}/resume")
+def resume_task_endpoint(task_id: str):
+    from services.demucs_worker import resume_task
+    if resume_task(task_id):
+        return {"message": "Tugas dilanjutkan."}
+    raise HTTPException(status_code=400, detail="Tidak dapat melanjutkan tugas ini.")
+
+@router.post("/tasks/{task_id}/cancel")
+def cancel_task_endpoint(task_id: str):
+    from services.demucs_worker import cancel_task
+    if cancel_task(task_id):
+        return {"message": "Tugas dibatalkan."}
+    raise HTTPException(status_code=400, detail="Tidak dapat membatalkan tugas ini.")
+
 from fastapi.responses import FileResponse, StreamingResponse
 import io
 import zipfile

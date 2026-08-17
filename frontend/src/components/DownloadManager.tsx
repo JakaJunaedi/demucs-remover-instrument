@@ -3,6 +3,8 @@ import { Download, FileArchive, Settings2, Loader2 } from 'lucide-react';
 import { exportCustomMix } from '@/lib/audio-export';
 import type { MixState } from './StemMixer';
 import { toast } from 'sonner';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 interface DownloadManagerProps {
   taskId: string;
@@ -46,47 +48,61 @@ export function DownloadManager({ taskId, mixState }: DownloadManagerProps) {
   };
 
   return (
-    <div className="w-full bg-card border border-border rounded-xl p-6 mt-4">
-      <h3 className="text-lg font-semibold mb-4 text-text-primary">Download Hasil</h3>
+    <Card className="w-full mt-4 border-none bg-black/20 backdrop-blur-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg text-white">Download Hasil</CardTitle>
+      </CardHeader>
       
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <a 
-          href={vocalsUrl}
-          className="flex items-center justify-center space-x-2 bg-border/30 hover:bg-border/50 border border-border p-3 rounded-lg transition-colors text-text-primary"
-        >
-          <Download className="w-4 h-4" />
-          <span className="font-medium text-sm">Vocals Only</span>
-        </a>
-        
-        <a 
-          href={instrumentalUrl}
-          className="flex items-center justify-center space-x-2 bg-border/30 hover:bg-border/50 border border-border p-3 rounded-lg transition-colors text-text-primary"
-        >
-          <Download className="w-4 h-4" />
-          <span className="font-medium text-sm">Instrumental Only</span>
-        </a>
-        
-        <a 
-          href={zipUrl}
-          className="flex items-center justify-center space-x-2 bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary p-3 rounded-lg transition-colors"
-        >
-          <FileArchive className="w-4 h-4" />
-          <span className="font-medium text-sm">Download Semua (ZIP)</span>
-        </a>
-        
-        <button 
-          onClick={handleCustomExport}
-          disabled={isExporting}
-          className="flex items-center justify-center space-x-2 bg-accent-secondary/10 hover:bg-accent-secondary/20 border border-accent-secondary/30 text-accent-secondary p-3 rounded-lg transition-colors disabled:opacity-50"
-        >
-          {isExporting ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Settings2 className="w-4 h-4" />
-          )}
-          <span className="font-medium text-sm">Export Custom Mix</span>
-        </button>
-      </div>
-    </div>
+      <CardContent>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Button 
+            variant="outline" 
+            className="w-full border-white/10 bg-white/5 hover:bg-white/10 text-white"
+            asChild
+          >
+            <a href={vocalsUrl}>
+              <Download className="w-4 h-4 mr-2" />
+              Vocals Only
+            </a>
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            className="w-full border-white/10 bg-white/5 hover:bg-white/10 text-white"
+            asChild
+          >
+            <a href={instrumentalUrl}>
+              <Download className="w-4 h-4 mr-2" />
+              Instrumental Only
+            </a>
+          </Button>
+          
+          <Button 
+            variant="default" 
+            className="w-full bg-accent-primary hover:bg-accent-secondary text-white shadow-lg shadow-accent-primary/20"
+            asChild
+          >
+            <a href={zipUrl}>
+              <FileArchive className="w-4 h-4 mr-2" />
+              Download Semua (ZIP)
+            </a>
+          </Button>
+          
+          <Button 
+            onClick={handleCustomExport}
+            disabled={isExporting}
+            variant="secondary"
+            className="w-full bg-accent-secondary/20 hover:bg-accent-secondary/30 text-accent-secondary border border-accent-secondary/30"
+          >
+            {isExporting ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Settings2 className="w-4 h-4 mr-2" />
+            )}
+            Export Custom Mix
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

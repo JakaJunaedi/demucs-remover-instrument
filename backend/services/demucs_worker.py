@@ -3,12 +3,62 @@ import json
 import time
 import shutil
 import re
+import psutil
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
+from typing import Dict
 from core.config import OUTPUTS_DIR, UPLOADS_DIR
+
+# Track active subprocesses by task_id
+ACTIVE_PROCESSES: Dict[str, subprocess.Popen] = {}
 
 def get_metadata_path(task_id: str) -> Path:
     return OUTPUTS_DIR / task_id / "metadata.json"
+
+def pause_task(task_id: str) -> bool:
+    if task_id in ACTIVE_PROCESSES:
+        try:
+            proc = ACTIVE_PROCESSES[task_id]
+            parent = psutil.Process(proc.pid)
+            for child in parent.children(recursive=True):
+                child.suspend()
+            parent.suspend()
+            update_metadata(task_id, {"status": "paused"})
+            return True
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            return False
+    return False
+
+def resume_task(task_id: str) -> bool:
+    if task_id in ACTIVE_PROCESSES:
+        try:
+            proc = ACTIVE_PROCESSES[task_id]
+            parent = psutil.Process(proc.pid)
+            for child in parent.children(recursive=True):
+                child.resume()
+            parent.resume()
+            update_metadata(task_id, {"status": "processing"})
+            return True
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            return False
+    return False
+
+def cancel_task(task_id: str) -> bool:
+    if task_id in ACTIVE_PROCESSES:
+        try:
+            # Tulis metadata DULUAN sebelum membunuh proses, 
+            # untuk menghindari race condition dengan thread proses utama
+            update_metadata(task_id, {"status": "failed", "error": "Proses dibatalkan oleh pengguna."})
+            
+            proc = ACTIVE_PROCESSES[task_id]
+            parent = psutil.Process(proc.pid)
+            for child in parent.children(recursive=True):
+                child.terminate()
+            parent.terminate()
+            return True
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            return False
+    return False
 
 def update_metadata(task_id: str, updates: dict):
     meta_path = get_metadata_path(task_id)
@@ -56,9 +106,11 @@ def process_audio_task(task_id: str, filename: str, duration: float):
             universal_newlines=True
         )
         
+        ACTIVE_PROCESSES[task_id] = process
+        
         last_percent = 0
         current_pass = 1
-        total_passes = 2
+        total_passes = 4
         
         for line in process.stdout:
             # Tampilkan langsung ke terminal backend agar pengguna bisa melihatnya
@@ -77,9 +129,13 @@ def process_audio_task(task_id: str, filename: str, duration: float):
                 
                 # Hitung persentase gabungan
                 pass_idx = min(current_pass - 1, total_passes - 1)
-                overall_percent = int((pass_idx * 50) + (percent / total_passes))
+                overall_percent = int((pass_idx * (100 / total_passes)) + (percent / total_passes))
                 
-                update_metadata(task_id, {"progress_percent": overall_percent})
+                update_metadata(task_id, {
+                    "progress_percent": overall_percent,
+                    "current_pass": min(current_pass, total_passes),
+                    "total_passes": total_passes
+                })
                     
         process.wait()
         
@@ -115,6 +171,17 @@ def process_audio_task(task_id: str, filename: str, duration: float):
         })
         
     except subprocess.CalledProcessError as e:
+        meta_path = get_metadata_path(task_id)
+        if meta_path.exists():
+            with open(meta_path, "r") as f:
+                data = json.load(f)
+            if data.get("error") == "Proses dibatalkan oleh pengguna.":
+                demucs_out_dir = OUTPUTS_DIR / "htdemucs_ft" / input_file.stem
+                if demucs_out_dir.exists():
+                    shutil.rmtree(demucs_out_dir, ignore_errors=True)
+                print(f"Task {task_id} canceled successfully and cleaned up.")
+                return
+                
         update_metadata(task_id, {
             "status": "failed",
             "error": "Demucs processing failed. Check logs."
@@ -125,3 +192,6 @@ def process_audio_task(task_id: str, filename: str, duration: float):
             "status": "failed",
             "error": str(e)
         })
+    finally:
+        if task_id in ACTIVE_PROCESSES:
+            del ACTIVE_PROCESSES[task_id]
