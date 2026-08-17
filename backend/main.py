@@ -21,6 +21,12 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(delete_old_tasks, "interval", hours=1)
     scheduler.start()
 
+    # Initialize Database & MinIO
+    from core.db import engine, Base
+    from core.storage import init_bucket
+    Base.metadata.create_all(bind=engine)
+    init_bucket()
+
     # Set max_workers=1 for CPU heavy Demucs
     loop = asyncio.get_running_loop()
     executor = ThreadPoolExecutor(max_workers=1)

@@ -28,7 +28,10 @@ export function YoutubeConverter() {
     <div className="w-full h-full flex flex-col pt-4 md:pt-10">
       <div className="mb-12 text-center">
         <h1 className="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-rose-400 tracking-tight mb-4 flex justify-center items-center gap-4">
-          <MonitorPlay className="w-10 h-10 text-red-500" />
+          <svg className="w-10 h-10 text-red-500" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+            <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33 2.78 2.78 0 0 0 1.94 2c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.33 29 29 0 0 0-.46-5.33z"></path>
+            <polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02" fill="white"></polygon>
+          </svg>
           YouTube <span className="text-white">to MP3</span>
         </h1>
         <p className="text-text-secondary text-base md:text-lg max-w-2xl mx-auto">

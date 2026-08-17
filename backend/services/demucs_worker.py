@@ -8,12 +8,15 @@ from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from typing import Dict
 from core.config import OUTPUTS_DIR, UPLOADS_DIR
+from core.db import update_task_db
+from core.storage import upload_file_to_minio
 
 # Track active subprocesses by task_id
 ACTIVE_PROCESSES: Dict[str, subprocess.Popen] = {}
 
-def get_metadata_path(task_id: str) -> Path:
-    return OUTPUTS_DIR / task_id / "metadata.json"
+# Keep update_metadata as an alias to avoid changing all calls
+def update_metadata(task_id: str, updates: dict):
+    update_task_db(task_id, updates)
 
 def pause_task(task_id: str) -> bool:
     if task_id in ACTIVE_PROCESSES:
@@ -46,10 +49,7 @@ def resume_task(task_id: str) -> bool:
 def cancel_task(task_id: str) -> bool:
     if task_id in ACTIVE_PROCESSES:
         try:
-            # Tulis metadata DULUAN sebelum membunuh proses, 
-            # untuk menghindari race condition dengan thread proses utama
             update_metadata(task_id, {"status": "failed", "error": "Proses dibatalkan oleh pengguna."})
-            
             proc = ACTIVE_PROCESSES[task_id]
             parent = psutil.Process(proc.pid)
             for child in parent.children(recursive=True):
@@ -59,20 +59,6 @@ def cancel_task(task_id: str) -> bool:
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             return False
     return False
-
-def update_metadata(task_id: str, updates: dict):
-    meta_path = get_metadata_path(task_id)
-    if meta_path.exists():
-        with open(meta_path, "r") as f:
-            data = json.load(f)
-    else:
-        data = {}
-        
-    data.update(updates)
-    
-    meta_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(meta_path, "w") as f:
-        json.dump(data, f, indent=2)
 
 def process_audio_task(task_id: str, filename: str, duration: float):
     """Background task to run Demucs and update metadata."""
@@ -148,12 +134,20 @@ def process_audio_task(task_id: str, filename: str, duration: float):
         demucs_out_dir = OUTPUTS_DIR / "htdemucs_ft" / input_file.stem
         
         if demucs_out_dir.exists():
+            output_dir.mkdir(parents=True, exist_ok=True)
             shutil.copy(demucs_out_dir / "vocals.wav", output_dir / "vocals.wav")
             shutil.copy(demucs_out_dir / "no_vocals.wav", output_dir / "no_vocals.wav")
+            
+            # Upload to MinIO
+            vocal_key = f"{task_id}/vocals.wav"
+            inst_key = f"{task_id}/no_vocals.wav"
+            upload_file_to_minio(str(output_dir / "vocals.wav"), vocal_key)
+            upload_file_to_minio(str(output_dir / "no_vocals.wav"), inst_key)
+            
             shutil.rmtree(demucs_out_dir)
             
-        vocals_size = (output_dir / "vocals.wav").stat().st_size
-        no_vocals_size = (output_dir / "no_vocals.wav").stat().st_size
+        vocals_size = (output_dir / "vocals.wav").stat().st_size if (output_dir / "vocals.wav").exists() else 0
+        no_vocals_size = (output_dir / "no_vocals.wav").stat().st_size if (output_dir / "no_vocals.wav").exists() else 0
         
         completed_at = datetime.now(timezone.utc)
         expires_at = completed_at + timedelta(days=1)
@@ -165,22 +159,35 @@ def process_audio_task(task_id: str, filename: str, duration: float):
             "completed_at": completed_at.isoformat(),
             "expires_at": expires_at.isoformat(),
             "stems": {
-                "vocals": {"file": "vocals.wav", "size_bytes": vocals_size},
-                "no_vocals": {"file": "no_vocals.wav", "size_bytes": no_vocals_size}
+                "vocals": {"file": "vocals.wav", "size_bytes": vocals_size, "minio_key": vocal_key},
+                "no_vocals": {"file": "no_vocals.wav", "size_bytes": no_vocals_size, "minio_key": inst_key}
             }
         })
         
+        # Cleanup
+        shutil.rmtree(output_dir, ignore_errors=True)
+        if input_file.parent.exists():
+            shutil.rmtree(input_file.parent, ignore_errors=True)
+        
     except subprocess.CalledProcessError as e:
-        meta_path = get_metadata_path(task_id)
-        if meta_path.exists():
-            with open(meta_path, "r") as f:
-                data = json.load(f)
-            if data.get("error") == "Proses dibatalkan oleh pengguna.":
-                demucs_out_dir = OUTPUTS_DIR / "htdemucs_ft" / input_file.stem
-                if demucs_out_dir.exists():
-                    shutil.rmtree(demucs_out_dir, ignore_errors=True)
-                print(f"Task {task_id} canceled successfully and cleaned up.")
-                return
+        from core.db import SessionLocal
+        from core.models import Task
+        
+        db = SessionLocal()
+        is_canceled = False
+        try:
+            task = db.query(Task).filter(Task.id == task_id).first()
+            if task and task.meta_data and task.meta_data.get("error") == "Proses dibatalkan oleh pengguna.":
+                is_canceled = True
+        finally:
+            db.close()
+            
+        if is_canceled:
+            demucs_out_dir = OUTPUTS_DIR / "htdemucs_ft" / input_file.stem
+            if demucs_out_dir.exists():
+                shutil.rmtree(demucs_out_dir, ignore_errors=True)
+            print(f"Task {task_id} canceled successfully and cleaned up.")
+            return
                 
         update_metadata(task_id, {
             "status": "failed",

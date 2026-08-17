@@ -8,3 +8,7 @@ numpy>=1.24.0
 slowapi>=0.1.9
 psutil>=5.9.0
 yt-dlp>=2023.11.16
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+boto3>=1.28.0
+python-dotenv>=1.0.0

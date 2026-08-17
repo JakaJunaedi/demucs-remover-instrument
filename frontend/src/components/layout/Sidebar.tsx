@@ -63,6 +63,15 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 </Link>
               </li>
               <li>
+                <Link to="/youtube" onClick={onClose} className={getLinkClass('/youtube')}>
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33 2.78 2.78 0 0 0 1.94 2c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.33 29 29 0 0 0-.46-5.33z"></path>
+                    <polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"></polygon>
+                  </svg>
+                  <span>Youtube To MP3</span>
+                </Link>
+              </li>
+              <li>
                 <Link to="/browse" onClick={onClose} className={getLinkClass('/browse')}>
                   <Compass className="w-5 h-5" />
                   <span>Browse</span>
@@ -85,12 +94,6 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 <Link to="/studio" onClick={onClose} className={getLinkClass('/studio')}>
                   <Mic2 className={cn("w-5 h-5", currentPath === '/studio' ? "text-accent-primary" : "")} />
                   <span>Vocal Remover</span>
-                </Link>
-              </li>
-              <li>
-                <Link to="/youtube" onClick={onClose} className={getLinkClass('/youtube')}>
-                  <MonitorPlay className="w-5 h-5" />
-                  <span>YT to MP3</span>
                 </Link>
               </li>
               <li>

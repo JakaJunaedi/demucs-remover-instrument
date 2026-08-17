@@ -813,6 +813,24 @@ Phase 3:                         ████████████
 |-------|---------|--------|-----------|
 | 1.0 | 2026-08-17 | Product Team | Initial PRD |
 | 1.1 | 2026-08-17 | Product Team | [R1] Processing async (background thread + polling); [R2] Tambah endpoint GET /tasks/{id}; [R3] Konvensi nama stem (API: no_vocals, UI: Instrumental); [R4] Processing time diselaraskan ke < 3x real-time; [R5] Custom mix via client-side Web Audio API; [R6] State task persistent via metadata.json; [R7] Rate limiting diturunkan ke opsional (MVP single-user); [R8] Batas ukuran file dipisah per format (MP3/M4A 50MB, WAV/FLAC 200MB) |
+| 1.2 | 2026-08-17 | Product Team | [R9] Menambahkan fitur YouTube to MP3 Converter terintegrasi dengan yt-dlp; [R10] Migrasi ke Arsitektur Cloud-Native dengan PostgreSQL untuk persistensi metadata (menggantikan metadata.json); [R11] Migrasi ke Object Storage menggunakan MinIO (S3-compatible) dengan sistem Presigned URL untuk performa unduhan optimal dan meringankan beban backend. |
+
+---
+
+## 11. Cloud-Native & Advanced Features (Phase 7 & 8)
+
+### 11.1 YouTube to MP3 Converter
+- **Deskripsi**: Fitur untuk mendownload audio dari YouTube secara langsung.
+- **Teknologi**: Menggunakan `yt-dlp` di dalam background thread. Mengatasi proteksi HTTP 403 dengan integrasi argumen ekstraktor `--extractor-args youtube:player_client=android` dan caching management yang baik.
+- **UI**: Halaman dedikasi "Youtube To MP3" di Sidebar (grup Menu). Menggunakan progress bar (Zustand store terpisah) dan dropdown pemilih Bitrate (128, 192, 320 kbps).
+
+### 11.2 PostgreSQL & SQLAlchemy
+- **Deskripsi**: Semua manajemen status tugas (ID, status, progress, waktu, dsb.) dipindahkan dari file teks lokal (`metadata.json`) ke PostgreSQL.
+- **Skema**: Tabel `tasks` tunggal yang menyimpan kolom ID, status, tipe tugas (demucs/youtube), dan kolom JSONB (`meta_data`) untuk fleksibilitas struktural yang dinamis.
+
+### 11.3 MinIO Object Storage
+- **Deskripsi**: Seluruh hasil pemrosesan (Vocals, Instrumental, MP3 YouTube) diunggah (upload) dari direktori sementara server ke *bucket* MinIO lokal.
+- **Presigned URLs**: Endpoint unduhan FastAPI kini mengembalikan `307 Temporary Redirect` bersama *S3 Presigned URL*. Frontend dan browser secara otomatis mengikuti URL tersebut untuk menarik file dari MinIO, menghilangkan beban streaming bandwidth 100% dari instance FastAPI.
 
 ---
 
